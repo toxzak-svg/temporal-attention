@@ -134,10 +134,11 @@ class EventBasedStore:
             
             temporal_score = msg_decay * focus_decay
             
-            combined = (
-                self.temporal_weight * temporal_score +
-                self.attention_weight * attention
-            )
+            # FIXED: Small recency bonus to prefer newer facts when tied
+            recency_bonus = 0.0001 * (self.message_count - fact.valid_from_message)
+            
+            # FIXED: Attention has NEGLIGIBLE effect (just breaks true ties)
+            combined = temporal_score * (1 + 0.001 * attention) + recency_bonus
             
             valid_facts.append(ScoredFact(
                 fact=fact,
@@ -216,7 +217,7 @@ class EventBasedStore:
             attention = self._attention(fact, at_message)
             
             temporal = msg_decay * focus_decay
-            combined = self.temporal_weight * temporal + self.attention_weight * attention
+            combined = temporal * (1 + self.attention_weight * attention)
             
             results.append(ScoredFact(
                 fact=fact,
