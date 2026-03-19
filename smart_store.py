@@ -77,6 +77,9 @@ class SmartEventStore:
         self.focus_decay_factor = focus_decay_factor
         self.temporal_weight = temporal_weight
         self.attention_weight = attention_weight
+        
+        # NEW: Track volatile facts - they auto-expire
+        self.volatile_facts: dict[str, datetime] = {}  # key -> expires_at
     
     def advance(self, focus: Optional[str] = None):
         self.message_count += 1
@@ -100,6 +103,10 @@ class SmartEventStore:
         focus: Optional[str] = None,
     ):
         """Add a fact with type and importance."""
+        
+        # NEW: Check if this fact type auto-expires
+        config = FACT_TYPE_CONFIG.get(fact_type, FACT_TYPE_CONFIG[FactType.CONTEXT])
+        
         fact = Fact(
             key=key,
             value=value,
@@ -112,6 +119,14 @@ class SmartEventStore:
         if key not in self.facts:
             self.facts[key] = []
         self.facts[key].append(fact)
+        
+        # NEW: Auto-expire volatile facts
+        # If fact changed (different value), old one is invalid
+        existing = [f for f in self.facts[key] if f.value != value]
+        if existing and config["volatility"] > 0:
+            # Old value is now invalid - mark it
+            for f in existing:
+                f.valid_to_message = self.message_count
     
     def get(self, key: str) -> Optional[ScoredFact]:
         if key not in self.facts:
