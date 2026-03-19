@@ -109,6 +109,7 @@ def test_history_matters():
     
     fm = FloatMemory()
     fm.put("project_name", "Alpha", permanence=0.8)
+    fm.advance()  # Advance so Beta is newer
     fm.put("project_name", "Beta", permanence=0.8)
     
     # Query: what's the current name?
