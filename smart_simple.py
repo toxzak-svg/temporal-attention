@@ -27,8 +27,9 @@ class FactType:
 # Half-life in messages for each type
 TYPE_DECAY = {
     FactType.NAME: float('inf'),      # Never decays
+    FactType.MUTABLE: 200,           # Slow decay, but keeps history
     FactType.PREFERENCE: 500,         # Very slow
-    FactType.CONTEXT: 30,            # Normal  
+    FactType.CONTEXT: 30,             # Normal  
     FactType.EPHEMERAL: 5,           # Fast
 }
 
@@ -82,6 +83,14 @@ class SmartStore:
         candidates.sort(key=lambda x: -x[0])
         return candidates[0][1] if candidates else None
     
+    def get_history(self, key, limit=10):
+        """Get history of a fact - especially useful for MUTABLE types."""
+        if key not in self.facts:
+            return []
+        
+        facts = sorted(self.facts[key], key=lambda f: -f.message_at)
+        return facts[:limit]
+    
     def _decay(self, fact):
         half_life = TYPE_DECAY.get(fact.fact_type, TYPE_DECAY[FactType.CONTEXT])
         if half_life == float('inf'):
@@ -107,6 +116,10 @@ if __name__ == "__main__":
     s.put("food_preference", "pizza", FactType.PREFERENCE, importance=0.8)
     s.put("current_topic", "weather", FactType.CONTEXT, importance=0.5)
     s.put("weather_right_now", "sunny", FactType.EPHEMERAL, importance=0.3)
+    s.put("project_name", "Alpha", FactType.MUTABLE, importance=0.9)
+    
+    # Later - change the project name!
+    s.put("project_name", "Beta", FactType.MUTABLE, importance=0.9)
     
     # Advance 100 messages
     for _ in range(100):
