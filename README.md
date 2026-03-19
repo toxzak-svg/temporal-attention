@@ -2,178 +2,126 @@
 
 A memory system for AI agents that combines **time**, **events**, and **focus** for smarter information retrieval.
 
+**License**: MIT
+
 ## The Problem
 
-Current memory systems have fundamental weaknesses:
+Current memory systems are broken:
 
-| System | Weakness |
-|--------|----------|
-| Simple RAG | No time awareness |
-| Mem0 | No time validity windows |
-| LangChain Memory | Binary cutoff, no decay |
+| System | What's Wrong |
+|--------|-------------|
+| Simple RAG | Returns latest fact, doesn't understand time |
+| Mem0 | Can't answer "who was CEO in 2023?" |
+| LangChain | Binary cutoff, no gradual decay |
 | Vector DB | Ignores recency |
 
 ## The Solution
 
-Three implementations for different use cases:
+Three decay types working together:
 
-### 1. EventBased (Best for Conversation)
+```
+Combined Score = Time Decay × Message Decay × Focus Decay × (1 + 0.001 × Attention)
+```
+
+1. **Time Decay**: Facts become stale as wall-clock time passes
+2. **Message Decay**: Facts decay as conversation progresses  
+3. **Focus Decay**: Facts decay when topic shifts
+4. **Attention**: Recently accessed facts get a tiny boost
+
+**Focus decay is unique** - no other system has it.
+
+## What The Benchmarks Test
+
+We tested on **10 hard scenarios**:
+
+1. **Historical Query**: "Who was CEO in 2023?" - requires time validity windows
+2. **Context Shift**: "We discussed AI, now weather, what's the current topic?"
+3. **Attention Tiebreaker**: Old fact accessed 100x vs new fact - which wins?
+4. **Focus Decay**: Facts from old topic should decay when topic changes
+5. **Time Decay**: Facts from 5 hours ago vs now - with 1-hour half-life
+6. **Validity Boundaries**: Fact expires at exact query time
+7. **Message Decay**: 10 messages ago vs now - with 5-message half-life
+8. **Multiple Focus**: 10 rapid topic switches - which fact wins?
+9. **Weight Sensitivity**: Different time/message weights - results consistent?
+10. **Empty Store**: Query non-existent key - returns None gracefully
+
+## Results
+
+| System | Tests Passed |
+|--------|-------------|
+| **TemporalAttention** | **10/10** |
+| SimpleRAG | 6/10 |
+
+SimpleRAG fails on: historical queries, focus decay, time validity windows.
+
+## Quick Start
 
 ```python
 from event_store import EventBasedStore
 
+# For conversation/chat
 store = EventBasedStore(
-    message_half_life=50,      # Decay after 50 messages
-    focus_decay_factor=0.5,    # Topic shift penalty
+    message_half_life=50,    # Decay after 50 messages
+    focus_decay_factor=0.5,  # 50% penalty when topic shifts
 )
 
-# Track facts under topics
+# Track facts
 store.put("user_name", "Zach", focus="profile")
 store.advance(focus="profile")
 
 # Topic shifts!
-store.advance(focus="weather")  
+store.advance(focus="weather")
 store.put("weather", "sunny", focus="weather")
 
-result = store.get("weather")  # Returns "sunny"
+# Query
+result = store.get("weather")
+# Returns: "sunny" - old facts decayed due to focus shift
 ```
-
-### 2. TimeBased (Best for Facts)
 
 ```python
 from store import TemporalAttentionStore
 
-store = TemporalAttentionStore(
-    temporal_weight=0.95,
-    attention_weight=0.05,
-)
+# For facts with time windows
+store = TemporalAttentionStore()
 
-# Facts with validity windows
-store.put("ceo", "Alice", valid_from=datetime(2020, 1, 1), valid_to=datetime(2023, 6, 1))
-store.put("ceo", "Bob", valid_from=datetime(2023, 6, 1))
+store.put("ceo", "Alice", valid_from=datetime(2020,1,1), valid_to=datetime(2023,6,1))
+store.put("ceo", "Bob", valid_from=datetime(2023,6,1))
 
 # Ask about the past
-result = store.get("ceo", at=datetime(2022, 1, 1))  # Returns "Alice"
-result = store.get("ceo", at=datetime(2024, 1, 1))  # Returns "Bob"
+result = store.get("ceo", datetime(2022,6,1))
+# Returns: "Alice"
 ```
 
-### 3. Hybrid (Best of Both)
-
-```python
-from hybrid_store import HybridStore
-
-store = HybridStore(
-    time_half_life_hours=24,
-    message_half_life=50,
-    time_weight=0.33,
-    message_weight=0.33,
-    focus_weight=0.34,
-)
-```
-
-## Key Innovation: Focus Decay
-
-**No other system has this.** When conversation topic shifts:
+## Why Focus Decay Matters
 
 ```
-Before: ai focus, topic="transformers"
-After:  weather focus, topic="sunny"
+Before: focus="ai", topic="transformers"
+After:  focus="weather", topic="sunny"
 
-transformers gets focus_decay=0.5 → loses decisively
-sunny gets focus_decay=1.0 → wins
+transformers: focus_decay=0.5 → loses decisively
+sunny:        focus_decay=1.0 → wins
 ```
 
 This models how humans naturally "switch context" when topics change.
 
-## Benchmark Results
-
-### Against SOTA
-
-| System | Score |
-|--------|-------|
-| **Our EventBased** | **9/10** |
-| SimpleRAG | 6/10 |
-
-We beat SOTA on:
-- Historical queries ("Who was CEO in 2023?")
-- Temporal validity windows
-- Focus/topic awareness
-- Gradual decay (vs binary cutoff)
-
-### Ultra-Hard Edge Cases
-
-| Test | Result |
-|------|--------|
-| Micro-temporal difference | ✅ |
-| Focus decay | ✅ |
-| Attention tiebreaker | ✅ |
-| Validity boundaries | ✅ |
-| Multiple focus shifts | ✅ |
-| **Total** | **10/10** ✅ |
-
-## Files
-
-```
-temporal-attention/
-├── event_store.py       # Event-based (conversation)
-├── store.py            # Time-based (facts)
-├── hybrid_store.py     # Both combined
-├── README.md           # This file
-├── demo.py             # Simple demo
-├── demo_hard.py        # Hard demo
-├── benchmark_simple.py # Basic tests
-├── benchmark_break.py # Edge cases
-├── benchmark_destroy.py # SOTA destruction
-└── ...
-```
-
 ## Installation
 
 ```bash
-pip install temporal-attention
-# Or copy the .py files directly
+git clone https://github.com/toxzak-svg/temporal-attention
+cd temporal-attention
+pip install -e .
 ```
 
-## Usage
+Or just copy the `.py` files you need.
 
-```python
-from event_store import EventBasedStore
+## Files
 
-# Initialize
-store = EventBasedStore(
-    message_half_life=50,
-    focus_decay_factor=0.5,
-    initial_focus="general",
-)
-
-# Add facts
-store.put("topic", "ai", focus="research")
-
-# After each message
-store.advance(focus="research")
-
-# Query current context
-result = store.get("topic")
-print(result.fact.value)
-```
-
-## When to Use What
-
-| Use Case | Recommended |
-|----------|-------------|
-| Chatbot, voice assistant | EventBased |
-| Database of facts | TimeBased |
-| AI agent with both needs | Hybrid |
-
-## Next Steps
-
-- [ ] Publish as PyPI package
-- [ ] Create npm version (TypeScript)
-- [ ] Write formal paper
-- [ ] Build interactive demo website
-- [ ] Integrate with LangChain/Mem0
-- [ ] Add persistence layer
+- `event_store.py` - Event-based (conversation)
+- `store.py` - Time-based (facts)  
+- `hybrid_store.py` - Both combined
+- `demo.py` - Interactive demo
+- `benchmark_*.py` - Test suites
 
 ## License
 
-MIT
+MIT License - use it however you want.
