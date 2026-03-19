@@ -1,101 +1,42 @@
-# Blog Post Draft: TemporalAttention
+# Float Permanence: How I Built Memory That Actually Remembers Names
 
-## Title Ideas:
-- "I Built a Memory System That Beats Mem0. Here's How."
-- "Focus Decay: The Memory System Feature Nobody Thought Of"
-- "Why All Memory Systems Are Broken (And How to Fix It)"
+I've been working on AI memory systems for a while and honestly... they're all kind of broken.
 
----
+## The Problem
 
-## The Post
+Current systems like Mem0, LangChain, and simple RAG treat all facts equally. They store the latest value and call it a day.
 
-### The Problem
+**The Overwrite Attack:**
+User says their name once. Then 1000 other facts get stored. What happens to the name? Gone.
 
-Current AI memory systems are broken. They either:
+## The Solution: Float Permanence
 
-- **Don't understand time**: SimpleRAG just returns the latest fact, even if it's 5 years old
-- **Don't handle validity windows**: Mem0 can't tell you "who was CEO in 2023" vs "who is CEO now"
-- **Don't understand context shifts**: When a conversation topic changes, old facts should decay
-
-### The Solution: Focus Decay
-
-I built a memory system that actually works. It combines three types of decay:
-
-1. **Time Decay**: Facts become less relevant as wall-clock time passes
-2. **Event Decay**: Facts become less relevant as conversation progresses  
-3. **Focus Decay**: Facts decay when the topic shifts
-
-**Focus decay is the killer feature.** No other system has it.
-
-When you're talking about AI, then switch to weather, your AI facts should decay - even if they were accessed recently.
-
-### The Benchmark
-
-I tested against SimpleRAG, Mem0-style, LangChain Window Memory, and TimeAwareRAG:
-
-| System | Score |
-|--------|-------|
-| **Our System** | **9/10** |
-| SimpleRAG | 6/10 |
-
-We beat them on:
-- Historical queries ("Who was CEO in 2023?")
-- Temporal validity windows
-- Focus/topic awareness
-- Gradual decay (vs binary cutoff)
-
-### The Code
+I use a single number (0-1) for permanence.
 
 ```python
-from event_store import EventBasedStore
-
-store = EventBasedStore(
-    message_half_life=50,
-    focus_decay_factor=0.5,
-)
-
-store.put("user_name", "Zach", focus="profile")
-store.advance(focus="weather")  # Topic shifts!
-store.put("weather", "sunny", focus="weather")
-
-result = store.get("weather")  
-# Returns: "sunny" - the old fact decayed due to focus shift
+store.auto_put("user_name", "Zach")   # permanence=1.0
+store.auto_put("project", "Alpha")      # permanence=0.8
+store.auto_put("weather", "sunny")       # permanence=0.1
 ```
 
-### Why This Matters
+After 1000 messages:
+- Zach: stays forever
+- Alpha: still there (slow decay)
+- sunny: decayed to 0.00004 (gone)
 
-AI agents need memory that actually works. Not just "store everything and hope." Real memory should:
+## The Hard Tests
 
-- Know when facts are stale
-- Understand context/topic changes  
-- Handle time validity windows
+**Test 1: Overwrite Attack**
+- FloatMemory: remembers Zach after 1000 facts ✅
+- SimpleRAG: overwritten ❌
+- WindowMemory: lost after 10 ❌
 
-That's what TemporalAttention does.
+**Test 2: Project History**
+- FloatMemory: stores all versions, can answer "what was it before?" ✅
+- SimpleRAG: can't answer ❌
 
-### Try It
+That's what human memory does. We don't forget names. We forget yesterday's weather.
 
-GitHub: github.com/toxzak-svg/temporal-attention
+## Code
 
----
-
-## Reddit Post (shorter)
-
-**Title**: I built a memory system that beats Mem0 on benchmarks. The killer feature? "Focus decay."
-
-**Body**:
-
-I built a memory system for AI agents that beats the existing options (Mem0, LangChain, simple RAG) on benchmark tests.
-
-The secret sauce? Focus decay - a feature nobody else has.
-
-When conversation topic shifts (AI -> weather), facts about the old topic naturally decay - even if they were recently accessed. This models how humans actually forget.
-
-Benchmark results:
-- Our system: 9/10
-- SimpleRAG: 6/10
-
-We win on temporal validity windows ("who was CEO in 2023?"), context awareness, and gradual decay.
-
-GitHub with code and demos: github.com/toxzak-svg/temporal-attention
-
-Thoughts? Am I missing something or is this actually useful?
+https://github.com/toxzak-svg/temporal-attention
