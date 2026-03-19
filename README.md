@@ -98,3 +98,29 @@ temporal-attention/
 | Fact database | TimeBased |
 | AI assistant | Hybrid |
 | Agent context | EventBased |
+
+## vs SOTA
+
+| System | Approach | Weakness |
+|--------|----------|-----------|
+| Mem0.ai | Recency + importance | No time validity windows |
+| LangChain | Buffer window | No decay, just cuts off |
+| RAG | Vector similarity | Ignores time/freshness |
+| **Our System** | Time + Message + Focus | Unique focus decay |
+
+### Why Focus Decay Wins
+
+No other system models **topic/context switching**:
+
+```python
+# Our system naturally handles this:
+store.put("topic", "ai_research", focus="ai")
+store.advance(focus="ai")
+store.advance(focus="weather")  # Topic shift!
+store.put("topic", "sunny", focus="weather")
+
+result = store.get("topic")  
+# Returns: "sunny" — AI research decayed due to focus shift
+```
+
+This models how humans naturally "forget" old context when topic changes.
