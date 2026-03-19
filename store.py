@@ -115,11 +115,8 @@ class TemporalAttentionStore:
             # Calculate attention score (based on access patterns)
             attention_score = self._attention_decay(fact, at)
             
-            # Combined score
-            combined = (
-                self.temporal_weight * temporal_score +
-                self.attention_weight * attention_score
-            )
+            # Combined score - attention should MODIFY temporal, not replace
+            combined = temporal_score * (1 + 0.001 * attention_score)
             
             scored_facts.append(ScoredFact(
                 fact=fact,
@@ -193,7 +190,7 @@ class TemporalAttentionStore:
             
             temporal = self._temporal_decay(fact, at)
             attention = self._attention_decay(fact, at)
-            combined = self.temporal_weight * temporal + self.attention_weight * attention
+            combined = temporal * (1 + 0.001 * attention)
             
             results.append(ScoredFact(
                 fact=fact,

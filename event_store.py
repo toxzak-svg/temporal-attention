@@ -173,12 +173,11 @@ class EventBasedStore:
             return self.focus_decay_factor
     
     def _attention(self, fact: Fact, at_message: int) -> float:
-        """Score based on access count - very heavily damped."""
+        """Score based on access count - NEGLIGIBLE effect."""
         if fact.access_count == 0:
             return 0.0
-        # Use log with large denominator - even 100 accesses should barely matter
-        # This ensures temporal always dominates unless temporal scores are nearly equal
-        count_score = math.log1p(fact.access_count) / 30  # log(101)/30 = 0.15 max
+        # Large denominator - attention should almost never overcome temporal
+        count_score = math.log1p(fact.access_count) / 100  # Max ~0.07 for 1000 accesses
         
         # Recency of access matters too
         messages_since_access = at_message - fact.last_accessed_message
